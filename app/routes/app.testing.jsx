@@ -42,8 +42,8 @@ const ProductList = () => {
             setSortValue(selected);
           }}
           renderItem={(item) => (
-            <ResourceItem
-            id={item.id}
+            <ResourceItem 
+            id={item.id} 
             url={`/product/${item.handle}`}
             accessibilityLabel={`View details for ${item.title}`}
             persistActions
