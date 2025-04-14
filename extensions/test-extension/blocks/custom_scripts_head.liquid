@@ -1,0 +1,14 @@
+{% comment %} <script src="{{ 'app-proxy-script.js' | asset_url }}" defer></script> {% endcomment %}
+<!-- This gets injected into every page when the embed is enabled -->
+
+{{ localization.market.metafields.custom_scripts.head_script }}
+{% comment %} {% render 'app-proxy-script' %} {% endcomment %}
+<!-- End embed Custom scripts -->
+
+{% schema %}
+  {
+    "name": "App Embed Head Script",
+    "target": "head",
+    "settings": []
+  }
+{% endschema %}
