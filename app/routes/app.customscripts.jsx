@@ -11,8 +11,9 @@ import {
   Banner,
   List,
 } from "@shopify/polaris";
-import { useFetcher, useLoaderData } from "@remix-run/react";
+import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import React from "react";
 
 
@@ -91,6 +92,14 @@ export async function loader({ request }) {
 
 // === Main Component ===
 export default function LayoutExample() {
+
+  const navigation = useNavigation();
+  const isPageLoading = navigation.state === "loading";
+
+  if (isPageLoading) {
+    return <LoadingSkeleton />;
+  }
+
   const fetcher = useFetcher();
   const { hasHead, hasBody, headValue, bodyValue } = useLoaderData();
   const metafieldsExist = hasHead && hasBody;

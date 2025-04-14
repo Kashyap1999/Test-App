@@ -1,10 +1,20 @@
 import React, { useState } from "react";
 import { Page, Card, ResourceList, ResourceItem, Text, Button, Spinner } from "@shopify/polaris";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useNavigation } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 
 
 const ProductList = () => {
+
+  const navigation = useNavigation();
+  const isPageLoading = navigation.state === "loading";
+
+  if (isPageLoading) {
+    return <LoadingSkeleton />;
+  }
+
+
   const loaderData = useLoaderData();
   console.log("Loader Data:", loaderData); // Debugging output
 
@@ -15,9 +25,7 @@ const ProductList = () => {
   const [hasNextPage, setHasNextPage] = useState(products.pageInfo?.hasNextPage || false);
   const [cursor, setCursor] = useState(products.edges.length ? products.edges[products.edges.length - 1].cursor : null);
   const [productList, setProductList] = useState(products.edges.map((edge) => edge.node));
-
   const [sortValue, setSortValue] = useState('DATE_MODIFIED_DESC');
-
 
   return (
     <Page title="Products">
@@ -99,6 +107,5 @@ export const loader = async ({ request }) => {
     return new Response(JSON.stringify({ edges: [], pageInfo: { hasNextPage: false } }), { status: 500 });
   }
 };
-
 
 export default ProductList;

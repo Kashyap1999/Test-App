@@ -1,16 +1,13 @@
 import React, { useState, useCallback } from "react";
 import { Page, Card, TextField, Text, Button, Spinner } from "@shopify/polaris";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher, useNavigation } from "@remix-run/react";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import db from "../db.server";
-
-
 
 export async function loader() {
   const scriptTableData = await db.customScripts.findMany();
   return new Response(JSON.stringify({ scriptTableData }), { headers: { "Content-Type": "application/json" } });
 }
-
-
 
 export async function action({ request }) {
   const formData = await request.formData();
@@ -49,6 +46,15 @@ export async function action({ request }) {
 }
 
 const ScriptPage = () => {
+
+  const navigation = useNavigation();
+  const isPageLoading = navigation.state === "loading";
+
+  if (isPageLoading) {
+    return <LoadingSkeleton />;
+  }
+
+
   const scriptData = useLoaderData();
 
   return (

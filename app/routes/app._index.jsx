@@ -13,7 +13,9 @@ import {
   InlineStack,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
-import { useLoaderData } from "@remix-run/react";
+import LoadingSkeleton from "../components/LoadingSkeleton";
+
+import { useLoaderData, useNavigation } from "@remix-run/react";
 // import { authenticate } from "../shopify.server";
 
 // export const loader = async ({ request }) => {
@@ -22,6 +24,12 @@ import { useLoaderData } from "@remix-run/react";
 // };
 
 export default function Index() {
+  const navigation = useNavigation();
+  const isPageLoading = navigation.state === "loading";
+
+  if (isPageLoading) {
+    return <LoadingSkeleton />;
+  }
   // const fetcher = useFetcher();
   // const shopify = useAppBridge();
   // const isLoading =

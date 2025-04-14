@@ -23,10 +23,20 @@ import {
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { PlusIcon, SearchIcon, EditIcon, XIcon, CheckIcon, DeleteIcon } from "@shopify/polaris-icons";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher, useNavigation } from "@remix-run/react";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import db from "../db.server";
 
 export default function AttributesPage() {
+
+  const navigation = useNavigation();
+  const isPageLoading = navigation.state === "loading";
+
+  if (isPageLoading) {
+    return <LoadingSkeleton />;
+  }
+
+
   const { attributes: initialAttributes = [], groupsloader } = useLoaderData();
   const [attributes, setAttributes] = useState(initialAttributes);
   const [isAddingAttribute, setIsAddingAttribute] = useState(false);

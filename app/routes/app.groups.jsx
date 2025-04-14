@@ -16,10 +16,19 @@ import {
 
 import { useState, useEffect } from "react";
 import { PlusIcon, SearchIcon, EditIcon, XIcon, CheckIcon, DeleteIcon } from "@shopify/polaris-icons";
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher, useNavigation } from "@remix-run/react";
 import db from "../db.server";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 
 export default function GroupsPage() {
+
+  const navigation = useNavigation();
+  const isPageLoading = navigation.state === "loading";
+
+  if (isPageLoading) {
+    return <LoadingSkeleton />;
+  }
+
   const { groups: initialGroups = [] } = useLoaderData();
   const [groups, setGroups] = useState(initialGroups);
   const [isAddingGroup, setIsAddingGroup] = useState(false);

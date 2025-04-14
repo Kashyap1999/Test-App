@@ -1,6 +1,8 @@
-import { useLoaderData } from "@remix-run/react";
 import { apiVersion, authenticate } from "../shopify.server";
+import { useLoaderData, useNavigation } from "@remix-run/react";
 import { Card, Layout, Page, List, Text } from "@shopify/polaris";
+import LoadingSkeleton from "../components/LoadingSkeleton";
+
 
 export const query = `
 {
@@ -60,29 +62,40 @@ export const loader = async ({ request }) => {
 }
 
 
-const collections = () => {
+const Collections = () => {
+  const navigation = useNavigation();
+  const isPageLoading = navigation.state === "loading";
+  
+  if (isPageLoading) {
+    return <LoadingSkeleton />;
+  }
+
   const collections = useLoaderData();
-  // console.log(collections, 'data');
 
   return (
     <Page>
       <Layout>
         <Layout.Section>
           <Card>
-            <Text  variant="heading2xl" tone="text-inverse-secondary" gap="loose" as="h1">Collection List</Text>
+            <Text variant="heading2xl" tone="text-inverse-secondary" as="h1">
+              Collection List
+            </Text>
             <br />
-            <List type="" gap="loose">
-              {
-                collections?.map(edge => {
-                  const { node: item } = edge;
-                  return (
-                    <List.Item>
-                      <h2>{item.title}</h2>
-                    </List.Item>
-                  )
-                })
-              }
-            </List>
+            {
+              <List gap="loose">
+                {
+                  collections?.map(edge => {
+                    const { node: item } = edge;
+                    return (
+                      <List.Item key={item.id}>
+                        <h2>{item.title}</h2>
+                        <p>{item.description}</p>
+                      </List.Item>
+                    )
+                  })
+                }
+              </List>
+            }
             <br />
           </Card>
         </Layout.Section>
@@ -91,4 +104,4 @@ const collections = () => {
   );
 }
 
-export default collections;
+export default Collections;
