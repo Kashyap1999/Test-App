@@ -16,10 +16,10 @@ const ProductList = () => {
 
 
   const loaderData = useLoaderData();
-  console.log("Loader Data:", loaderData); // Debugging output
+  // console.log("Loader Data:", loaderData); // Debugging output
 
   const products = loaderData ?? { edges: [], pageInfo: { hasNextPage: false } };
-  console.log("products:", products);
+  // console.log("products:", products);
 
   const [loading, setLoading] = useState(false);
   const [hasNextPage, setHasNextPage] = useState(products.pageInfo?.hasNextPage || false);
