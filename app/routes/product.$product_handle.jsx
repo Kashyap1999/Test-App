@@ -16,6 +16,7 @@ import {
   useLoaderData,
   useNavigation,
   useParams,
+  useFetcher,
 } from "@remix-run/react";
 import { DeleteIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -30,10 +31,56 @@ const ProductList = () => {
   if (isPageLoading) {
     return <LoadingSkeleton />;
   }
+  const fetcher = useFetcher();
 
-  const { product, attributes, groups } = useLoaderData();
-  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
-  const [attributeValues, setAttributeValues] = useState({});
+  const { product, attributes, groups, metafieldData } = useLoaderData();
+  // console.log("metafieldData", typeof metafieldData);
+  const metafieldDataObject = useMemo(() => {
+    if (!metafieldData) return {};
+    try {
+      return typeof metafieldData === "string" ? JSON.parse(metafieldData) : metafieldData;
+    } catch (error) {
+      console.error("Failed to parse metafieldData:", error);
+      return {};
+    }
+  }, [metafieldData]);
+  // console.log("metafieldData", metafieldDataObject);
+  
+  const groupNameToId = useMemo(() => {
+    return Object.fromEntries(groups.map((g) => [g.name, g.id]));
+  }, [groups]);
+
+  const attributeNameToId = useMemo(() => {
+    const map = {};
+    attributes.forEach((attr) => {
+      map[attr.name] = attr.id;
+    });
+    return map;
+  }, [attributes]);
+
+  const [selectedGroupIds, setSelectedGroupIds] = useState(() => {
+    if (!metafieldDataObject || typeof metafieldDataObject !== "object") return [];
+    const groupIds = Object.keys(metafieldDataObject)
+      .map((groupName) => groupNameToId[groupName])
+    return groupIds;
+  });
+
+  // console.log("selectedGroupIds", selectedGroupIds);
+  
+
+  // Populate attribute values from metafield data
+  const [attributeValues, setAttributeValues] = useState(() => {
+    const values = {};
+    if (metafieldDataObject && typeof metafieldDataObject === "object") {
+      for (const [groupName, groupAttributes] of Object.entries(metafieldDataObject)) {
+        for (const [attrName, val] of Object.entries(groupAttributes)) {
+          const attrId = attributeNameToId[attrName];
+          if (attrId) values[attrId] = val;
+        }
+      }
+    }
+    return values;
+  });
 
   // Filter attributes that belong to selected groups
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
@@ -122,17 +169,21 @@ const ProductList = () => {
                               icon={DeleteIcon}
                               onClick={() => {
                                 setSelectedGroupIds((prev) => {
-                                  const updatedGroupIds = prev.filter((id) => id !== group.id);
+                                  const updatedGroupIds = prev.filter(
+                                    (id) => id !== group.id,
+                                  );
                                   // Find all attribute IDs tied to this group
-                                  const attributesToRemove = attributes
+                                  const attribumetafieldDataObjectoRemove = attributes
                                     .filter((attr) =>
-                                      attr.groups.some((g) => g.id === group.id)
+                                      attr.groups.some(
+                                        (g) => g.id === group.id,
+                                      ),
                                     )
                                     .map((attr) => attr.id);
                                   // Remove those attributes from the state
                                   setAttributeValues((prevValues) => {
                                     const updatedValues = { ...prevValues };
-                                    attributesToRemove.forEach((id) => {
+                                    attribumetafieldDataObjectoRemove.forEach((id) => {
                                       delete updatedValues[id];
                                     });
                                     return updatedValues;
@@ -200,13 +251,22 @@ const ProductList = () => {
               <br />
               {hasChanges && (
                 <div style={{ marginTop: "20px" }}>
-                  <Button
-                    variant="primary"
-                    fullWidth
-                    onClick={() => console.log("Save clicked", attributeValues)}
-                  >
-                    Save
-                  </Button>
+                  <fetcher.Form method="post">
+                    <input
+                      type="hidden"
+                      name="metafieldData"
+                      value={JSON.stringify(formattedOutput)}
+                    />
+                    <input type="hidden" name="productId" value={product.id} />
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      submit
+                      loading={fetcher.state === "submitting"}
+                    >
+                      Save
+                    </Button>
+                  </fetcher.Form>
                 </div>
               )}
             </Card>
@@ -243,8 +303,9 @@ export const loader = async ({ request, params }) => {
   try {
     const { admin } = await authenticate.admin(request);
 
-    // Fetch product by handle from Shopify
     let product = null;
+    let metafieldData = {};
+
     if (params.product_handle) {
       const response = await admin.graphql(`
         query {
@@ -252,6 +313,10 @@ export const loader = async ({ request, params }) => {
             id
             handle
             title
+            metafield(namespace: "custom", key: "attribute_config") {
+              id
+              value
+            }
           }
         }
       `);
@@ -264,9 +329,12 @@ export const loader = async ({ request, params }) => {
           status: 404,
         });
       }
+
+      if (product.metafield?.value) {
+        metafieldData = JSON.parse(product.metafield.value);
+      }
     }
 
-    // Fetch groups and their attributes from your DB
     const attributes = await db.attributes.findMany({
       include: {
         groups: {
@@ -280,13 +348,67 @@ export const loader = async ({ request, params }) => {
 
     const groups = await db.groups.findMany({});
 
-    return new Response(JSON.stringify({ product, attributes, groups }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ product, attributes, groups, metafieldData }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
     console.error("❌ Error in loader:", error);
     return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+    });
+  }
+};
+
+export const action = async ({ request }) => {
+  const { admin } = await authenticate.admin(request);
+  const formData = await request.formData();
+
+  const productId = formData.get("productId");
+  const metafieldData = formData.get("metafieldData");
+
+  try {
+    const response = await admin.graphql(`
+      mutation {
+        metafieldsSet(metafields: [
+          {
+            namespace: "custom",
+            key: "attribute_config",
+            type: "json",
+            value: ${JSON.stringify(JSON.stringify(metafieldData))},
+            ownerId: "${productId}"
+          }
+        ]) {
+          metafields {
+            id
+            key
+            value
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `);
+
+    const json = await response.json();
+    const errors = json?.data?.metafieldsSet?.userErrors;
+
+    if (errors?.length > 0) {
+      console.error("Metafield save errors:", errors);
+      return new Response(JSON.stringify({ error: errors[0].message }), {
+        status: 400,
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (err) {
+    console.error("Metafield save failed:", err);
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
     });
   }
