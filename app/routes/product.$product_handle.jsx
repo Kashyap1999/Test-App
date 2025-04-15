@@ -3,38 +3,37 @@ import {
   Page,
   Card,
   TextField,
-  InlineStack,
   Tag,
   Text,
   Button,
-  Select,
   BlockStack,
   Combobox,
   Listbox,
+  Layout,
+  EmptyState,
 } from "@shopify/polaris";
 import {
   useLoaderData,
   useNavigation,
   useParams,
-  Link,
 } from "@remix-run/react";
+import { DeleteIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import LoadingSkeleton from "../components/LoadingSkeleton";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import db from "../db.server"; // adjust path to your Prisma setup
 
 const ProductList = () => {
   const navigation = useNavigation();
   const isPageLoading = navigation.state === "loading";
   const { product_handle } = useParams();
-  const { product, attributes, groups } = useLoaderData();
-
-  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
-  const [attributeValues, setAttributeValues] = useState({});
 
   if (isPageLoading) {
     return <LoadingSkeleton />;
   }
+
+  const { product, attributes, groups } = useLoaderData();
+  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
+  const [attributeValues, setAttributeValues] = useState({});
 
   // Filter attributes that belong to selected groups
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
@@ -62,87 +61,180 @@ const ProductList = () => {
     {},
   );
 
-  const groupOptions = groups.map((group) => ({
-    label: group.name,
-    value: group.id,
-  }));
+  const initialValues = useMemo(() => {
+    const initial = {};
+    attributes.forEach((attr) => {
+      initial[attr.id] = "";
+    });
+    return initial;
+  }, [attributes]);
+
+  // 4. Change tracker
+  const hasChanges = useMemo(() => {
+    return Object.entries(attributeValues).some(
+      ([key, val]) => val !== initialValues[key],
+    );
+  }, [attributeValues, initialValues]);
 
   return (
-    <Page title={product?.title || "Product"}>
-      <Card sectioned>
-        {product ? (
-          <>
-            <Text variant="headingLg">{product.title}</Text>
-            <Text>{product.description}</Text>
-          </>
-        ) : (
-          <Text>Product not found</Text>
-        )}
+    <Page
+      title={product?.title || "Product"}
+      backAction={{ content: "Products", url: "/app/products" }}
+      secondaryActions={[
+        {
+          content: "Create Groups",
+          url: "/app/groups",
+        },
+        {
+          content: "Create Attributes",
+          url: "/app/attributes",
+        },
+      ]}
+    >
+      <Layout>
+        <Layout.Section>
+          <Card sectioned>
+            {/* Grouped Attributes Inputs */}
+            {selectedGroupIds.length > 0 ? (
+              <div style={{ marginTop: "30px" }}>
+                <BlockStack gap="300">
+                  {Object.entries(groupedAttributes).map(
+                    ([groupName, attrs]) => {
+                      const group = groups.find((g) => g.name === groupName);
+                      if (!group) return null;
 
-        {/* Multi Group Select */}
-        <div style={{ marginTop: "20px" }}>
-          <Text variant="headingMd">Select Groups:</Text>
-          <GroupSelector
-            groups={groups}
-            selectedGroups={groups.filter((g) =>
-              selectedGroupIds.includes(g.id),
+                      return (
+                        <Card key={groupName} title={groupName} sectioned>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text variant="headingMd" as="h6">
+                              {groupName}
+                            </Text>
+                            <Button
+                              tone="critical"
+                              variant="tertiary"
+                              size="slim"
+                              icon={DeleteIcon}
+                              onClick={() => {
+                                setSelectedGroupIds((prev) => {
+                                  const updatedGroupIds = prev.filter((id) => id !== group.id);
+                                  // Find all attribute IDs tied to this group
+                                  const attributesToRemove = attributes
+                                    .filter((attr) =>
+                                      attr.groups.some((g) => g.id === group.id)
+                                    )
+                                    .map((attr) => attr.id);
+                                  // Remove those attributes from the state
+                                  setAttributeValues((prevValues) => {
+                                    const updatedValues = { ...prevValues };
+                                    attributesToRemove.forEach((id) => {
+                                      delete updatedValues[id];
+                                    });
+                                    return updatedValues;
+                                  });
+                                  return updatedGroupIds;
+                                });
+                              }}
+                            />
+                          </div>
+                          <br />
+                          <BlockStack gap="200">
+                            {attrs.map((attr) => (
+                              <TextField
+                                key={attr.id}
+                                label={attr.name}
+                                value={attributeValues[attr.id] || ""}
+                                onChange={(val) =>
+                                  handleValueChange(attr.id, val)
+                                }
+                                autoComplete="off"
+                                gap="200"
+                              />
+                            ))}
+                          </BlockStack>
+                        </Card>
+                      );
+                    },
+                  )}
+                </BlockStack>
+              </div>
+            ) : (
+              <EmptyState
+                heading="No groups selected"
+                action={{
+                  content: "Select groups",
+                  onAction: () => {
+                    // Scroll to group selector or focus it if needed
+                    document
+                      .querySelector("input[placeholder='Select Groups']")
+                      ?.focus();
+                  },
+                }}
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png" // You can use Polaris CDN images
+              >
+                <p>
+                  Select one or more groups to start customizing product
+                  attributes.
+                </p>
+              </EmptyState>
             )}
-            onGroupSelect={(selected) =>
-              setSelectedGroupIds(selected.map((g) => g.id))
-            }
-          />
+          </Card>
+        </Layout.Section>
+        <div style={{ width: "350px" }}>
+          <Layout.Section variant="oneThird">
+            <Card title="Custom Script" sectioned>
+              <GroupSelector
+                groups={groups}
+                selectedGroups={groups.filter((g) =>
+                  selectedGroupIds.includes(g.id),
+                )}
+                onGroupSelect={(selected) =>
+                  setSelectedGroupIds(selected.map((g) => g.id))
+                }
+              />
+              <br />
+              {hasChanges && (
+                <div style={{ marginTop: "20px" }}>
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    onClick={() => console.log("Save clicked", attributeValues)}
+                  >
+                    Save
+                  </Button>
+                </div>
+              )}
+            </Card>
+            <br />
+            {/* JSON Output */}
+            {selectedGroupIds.length > 0 && (
+              <Card>
+                <div style={{ marginTop: "0" }}>
+                  <Text variant="headingMd">Generated JSON:</Text>
+                  <pre
+                    style={{
+                      background: "#f6f6f7",
+                      padding: ".5rem",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      whiteSpace: "pre-wrap",
+                      wordWrap: "break-word",
+                      overflowX: "auto",
+                    }}
+                  >
+                    {JSON.stringify(formattedOutput, null, 2)}
+                  </pre>
+                </div>
+              </Card>
+            )}
+          </Layout.Section>
         </div>
-
-        {/* Grouped Attributes Inputs */}
-        {selectedGroupIds.length > 0 && (
-          <div style={{ marginTop: "30px" }}>
-            <BlockStack gap="300">
-              {Object.entries(groupedAttributes).map(([groupName, attrs]) => (
-                <Card key={groupName} title={groupName} sectioned>
-                  <Text variant="headingMd" as="h6">
-                    {groupName}
-                  </Text>
-                  <br />
-                  <BlockStack gap="200">
-                    {attrs.map((attr) => (
-                      <TextField
-                        key={attr.id}
-                        label={attr.name}
-                        value={attributeValues[attr.id] || ""}
-                        onChange={(val) => handleValueChange(attr.id, val)}
-                        autoComplete="off"
-                        gap="200"
-                      />
-                    ))}
-                  </BlockStack>
-                </Card>
-              ))}
-            </BlockStack>
-          </div>
-        )}
-
-        {/* JSON Output */}
-        {selectedGroupIds.length > 0 && (
-          <div style={{ marginTop: "30px" }}>
-            <Text variant="headingMd">Generated JSON:</Text>
-            <pre
-              style={{
-                background: "#f6f6f7",
-                padding: "1rem",
-                borderRadius: "8px",
-              }}
-            >
-              {JSON.stringify(formattedOutput, null, 2)}
-            </pre>
-          </div>
-        )}
-
-        <div style={{ marginTop: "20px" }}>
-          <Link to="/app/products">
-            <Button>Back to Products</Button>
-          </Link>
-        </div>
-      </Card>
+      </Layout>
     </Page>
   );
 };
@@ -269,7 +361,7 @@ export function GroupSelector({
             label="Select Groups"
             labelHidden
             value={searchValue}
-            placeholder="Search Groups"
+            placeholder="Select Groups"
             verticalContent={selectedGroupTags}
             onChange={setSearchValue}
           />
