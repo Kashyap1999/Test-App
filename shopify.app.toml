@@ -3,7 +3,7 @@
 client_id = "274cc7aa84961d999a946c409d62ad46"
 name = "test-app"
 handle = "test-app-11783"
-application_url = "https://joel-julia-thoughts-restrictions.trycloudflare.com"
+application_url = "https://customs-injection-duck-bluetooth.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,13 +27,13 @@ scopes = "read_markets,write_content,write_markets,write_products"
 
 [auth]
 redirect_urls = [
-  "https://joel-julia-thoughts-restrictions.trycloudflare.com/auth/callback",
-  "https://joel-julia-thoughts-restrictions.trycloudflare.com/auth/shopify/callback",
-  "https://joel-julia-thoughts-restrictions.trycloudflare.com/api/auth/callback"
+  "https://customs-injection-duck-bluetooth.trycloudflare.com/auth/callback",
+  "https://customs-injection-duck-bluetooth.trycloudflare.com/auth/shopify/callback",
+  "https://customs-injection-duck-bluetooth.trycloudflare.com/api/auth/callback"
 ]
 
 [app_proxy]
-url = "https://joel-julia-thoughts-restrictions.trycloudflare.com/app/api"
+url = "https://customs-injection-duck-bluetooth.trycloudflare.com/app/api"
 subpath = "proxytest1"
 prefix = "apps"
 
