@@ -38,14 +38,16 @@ const ProductList = () => {
   const metafieldDataObject = useMemo(() => {
     if (!metafieldData) return {};
     try {
-      return typeof metafieldData === "string" ? JSON.parse(metafieldData) : metafieldData;
+      return typeof metafieldData === "string"
+        ? JSON.parse(metafieldData)
+        : metafieldData;
     } catch (error) {
       console.error("Failed to parse metafieldData:", error);
       return {};
     }
   }, [metafieldData]);
   // console.log("metafieldData", metafieldDataObject);
-  
+
   const groupNameToId = useMemo(() => {
     return Object.fromEntries(groups.map((g) => [g.name, g.id]));
   }, [groups]);
@@ -59,20 +61,23 @@ const ProductList = () => {
   }, [attributes]);
 
   const [selectedGroupIds, setSelectedGroupIds] = useState(() => {
-    if (!metafieldDataObject || typeof metafieldDataObject !== "object") return [];
-    const groupIds = Object.keys(metafieldDataObject)
-      .map((groupName) => groupNameToId[groupName])
+    if (!metafieldDataObject || typeof metafieldDataObject !== "object")
+      return [];
+    const groupIds = Object.keys(metafieldDataObject).map(
+      (groupName) => groupNameToId[groupName],
+    );
     return groupIds;
   });
 
   // console.log("selectedGroupIds", selectedGroupIds);
-  
 
   // Populate attribute values from metafield data
   const [attributeValues, setAttributeValues] = useState(() => {
     const values = {};
     if (metafieldDataObject && typeof metafieldDataObject === "object") {
-      for (const [groupName, groupAttributes] of Object.entries(metafieldDataObject)) {
+      for (const [groupName, groupAttributes] of Object.entries(
+        metafieldDataObject,
+      )) {
         for (const [attrName, val] of Object.entries(groupAttributes)) {
           const attrId = attributeNameToId[attrName];
           if (attrId) values[attrId] = val;
@@ -99,10 +104,16 @@ const ProductList = () => {
 
   const formattedOutput = Object.entries(groupedAttributes).reduce(
     (result, [groupName, attrs]) => {
-      result[groupName] = {};
+      const nonEmptyAttrs = {};
       attrs.forEach((attr) => {
-        result[groupName][attr.name] = attributeValues[attr.id] || "";
+        const val = attributeValues[attr.id];
+        if (val && val.trim() !== "") {
+          nonEmptyAttrs[attr.name] = val;
+        }
       });
+      if (Object.keys(nonEmptyAttrs).length > 0) {
+        result[groupName] = nonEmptyAttrs;
+      }
       return result;
     },
     {},
@@ -122,6 +133,12 @@ const ProductList = () => {
       ([key, val]) => val !== initialValues[key],
     );
   }, [attributeValues, initialValues]);
+
+  useEffect(() => {
+    setValue(JSON.stringify(formattedOutput, null, 2));
+  }, [formattedOutput]);
+  const [value, setValue] = useState(JSON.stringify(formattedOutput, null, 2));
+  const [groupErrors, setGroupErrors] = useState({});
 
   return (
     <Page
@@ -173,19 +190,22 @@ const ProductList = () => {
                                     (id) => id !== group.id,
                                   );
                                   // Find all attribute IDs tied to this group
-                                  const attribumetafieldDataObjectoRemove = attributes
-                                    .filter((attr) =>
-                                      attr.groups.some(
-                                        (g) => g.id === group.id,
-                                      ),
-                                    )
-                                    .map((attr) => attr.id);
+                                  const attribumetafieldDataObjectoRemove =
+                                    attributes
+                                      .filter((attr) =>
+                                        attr.groups.some(
+                                          (g) => g.id === group.id,
+                                        ),
+                                      )
+                                      .map((attr) => attr.id);
                                   // Remove those attributes from the state
                                   setAttributeValues((prevValues) => {
                                     const updatedValues = { ...prevValues };
-                                    attribumetafieldDataObjectoRemove.forEach((id) => {
-                                      delete updatedValues[id];
-                                    });
+                                    attribumetafieldDataObjectoRemove.forEach(
+                                      (id) => {
+                                        delete updatedValues[id];
+                                      },
+                                    );
                                     return updatedValues;
                                   });
                                   return updatedGroupIds;
@@ -200,13 +220,21 @@ const ProductList = () => {
                                 key={attr.id}
                                 label={attr.name}
                                 value={attributeValues[attr.id] || ""}
-                                onChange={(val) =>
-                                  handleValueChange(attr.id, val)
-                                }
+                                onChange={(val) => {
+                                  handleValueChange(attr.id, val);
+                                  setGroupErrors((prev) => ({
+                                    ...prev,
+                                    [groupName]: undefined,
+                                  }));
+                                }}
                                 autoComplete="off"
-                                gap="200"
                               />
                             ))}
+                            {groupErrors[groupName] && (
+                              <Text tone="critical" variant="bodySm">
+                                {groupErrors[groupName]}
+                              </Text>
+                            )}
                           </BlockStack>
                         </Card>
                       );
@@ -249,46 +277,115 @@ const ProductList = () => {
                 }
               />
               <br />
-              {hasChanges && (
-                <div style={{ marginTop: "20px" }}>
-                  <fetcher.Form method="post">
-                    <input
-                      type="hidden"
-                      name="metafieldData"
-                      value={JSON.stringify(formattedOutput)}
-                    />
-                    <input type="hidden" name="productId" value={product.id} />
-                    <Button
-                      variant="primary"
-                      fullWidth
-                      submit
-                      loading={fetcher.state === "submitting"}
-                    >
-                      Save
-                    </Button>
-                  </fetcher.Form>
-                </div>
-              )}
+              <div style={{ marginTop: "20px" }}>
+                <fetcher.Form
+                  method="post"
+                  onSubmit={(e) => {
+                    const newGroupErrors = {};
+                    let isValid = true;
+
+                    Object.entries(groupedAttributes).forEach(
+                      ([groupName, attrs]) => {
+                        const isGroupEmpty = attrs.every(
+                          (attr) =>
+                            !attributeValues[attr.id] ||
+                            attributeValues[attr.id].trim() === "",
+                        );
+
+                        if (isGroupEmpty) {
+                          isValid = false;
+                          newGroupErrors[groupName] =
+                            `At least one attribute in "${groupName}" must be filled.`;
+                        }
+                      },
+                    );
+
+                    if (!isValid) {
+                      e.preventDefault();
+                      setGroupErrors(newGroupErrors);
+                    } else {
+                      setGroupErrors({});
+                    }
+                  }}
+                >
+                  <input
+                    type="hidden"
+                    name="metafieldData"
+                    value={JSON.stringify(formattedOutput)}
+                  />
+                  <input type="hidden" name="productId" value={product.id} />
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    submit
+                    loading={fetcher.state === "submitting"}
+                  >
+                    Save
+                  </Button>
+                </fetcher.Form>
+              </div>
             </Card>
             <br />
             {/* JSON Output */}
             {selectedGroupIds.length > 0 && (
               <Card>
                 <div style={{ marginTop: "0" }}>
-                  <Text variant="headingMd">Generated JSON:</Text>
-                  <pre
-                    style={{
-                      background: "#f6f6f7",
-                      padding: ".5rem",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                      whiteSpace: "pre-wrap",
-                      wordWrap: "break-word",
-                      overflowX: "auto",
+                  {/* <Text variant="headingMd">Generated JSON:</Text> */}
+                  <TextField
+                    label="Generated JSON"
+                    value={value}
+                    multiline={6}
+                    autoComplete="off"
+                    onChange={(newVal) => {
+                      setValue(newVal);
+
+                      try {
+                        const parsed = JSON.parse(newVal);
+                        const updatedValues = {};
+                        const updatedGroupIds = new Set(selectedGroupIds);
+                        const emptyGroups = [];
+
+                        Object.entries(parsed).forEach(
+                          ([groupName, groupAttrs]) => {
+                            const groupId = groupNameToId[groupName];
+                            if (groupId) {
+                              if (
+                                typeof groupAttrs === "object" &&
+                                Object.keys(groupAttrs).length === 0
+                              ) {
+                                emptyGroups.push(groupName);
+                              } else {
+                                updatedGroupIds.add(groupId);
+                              }
+
+                              Object.entries(groupAttrs).forEach(
+                                ([attrName, attrValue]) => {
+                                  const attrId = attributeNameToId[attrName];
+                                  if (attrId) {
+                                    updatedValues[attrId] = attrValue;
+                                  }
+                                },
+                              );
+                            }
+                          },
+                        );
+
+                        if (emptyGroups.length > 0) {
+                          alert(
+                            `The following group(s) have no attribute values:\n\n${emptyGroups.join(
+                              ", ",
+                            )}\n\nPlease add at least one attribute value.`,
+                          );
+                          return;
+                        }
+
+                        setAttributeValues(updatedValues);
+                        setSelectedGroupIds([...updatedGroupIds]);
+                      } catch (err) {
+                        console.warn("Invalid JSON input", err);
+                      }
                     }}
-                  >
-                    {JSON.stringify(formattedOutput, null, 2)}
-                  </pre>
+                  />
                 </div>
               </Card>
             )}
