@@ -3,7 +3,7 @@
 client_id = "274cc7aa84961d999a946c409d62ad46"
 name = "test-app"
 handle = "test-app-11783"
-application_url = "https://component-cause-age-signed.trycloudflare.com"
+application_url = "https://addresses-ghz-motors-monte.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,13 +27,13 @@ scopes = "read_markets,write_content,write_markets,write_products"
 
 [auth]
 redirect_urls = [
-  "https://component-cause-age-signed.trycloudflare.com/auth/callback",
-  "https://component-cause-age-signed.trycloudflare.com/auth/shopify/callback",
-  "https://component-cause-age-signed.trycloudflare.com/api/auth/callback"
+  "https://addresses-ghz-motors-monte.trycloudflare.com/auth/callback",
+  "https://addresses-ghz-motors-monte.trycloudflare.com/auth/shopify/callback",
+  "https://addresses-ghz-motors-monte.trycloudflare.com/api/auth/callback"
 ]
 
 [app_proxy]
-url = "https://component-cause-age-signed.trycloudflare.com/app/api"
+url = "https://addresses-ghz-motors-monte.trycloudflare.com/app/api"
 subpath = "proxytest1"
 prefix = "apps"
 
